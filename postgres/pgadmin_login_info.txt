@@ -1,0 +1,7 @@
+email: admin@admin.com
+pass: admin
+
+hostname: postgres
+port: 5432
+username: test1
+pass: test1
