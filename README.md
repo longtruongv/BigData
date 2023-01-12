@@ -15,7 +15,7 @@
 
 2. Load dữ liệu từ MongoDB, xử lý bằng Spark, lưu vào Postgres (Phần này đang test, về sau sẽ không dùng notebook mà chạy python trực tiếp):
 - Mở Pyspark Notebook:
-    - Vào Docker Desktop, mục `Container / Apps`
+    - Vào Docker Desktop, mục `Containers / Apps`
     - Chọn `pyspark-notebook`
     - Tìm dòng này và mở bằng trình duyệt: 
     ![pyspark-notebook](https://user-images.githubusercontent.com/57038442/212036829-f074d9b1-40cf-483b-9cd8-ecc369c432ff.png)
