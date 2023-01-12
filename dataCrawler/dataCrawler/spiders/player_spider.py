@@ -2,7 +2,7 @@ import scrapy
 from scrapy import Selector
 from scrapy.http import Request, Response
 
-from dataCrawler.items import PlayerItem
+from dataCrawler.items import GeneralItem
 
 # COUNTRY_LIST = [
 #     '/en/country/players/ENG/England-Football-Players',
@@ -90,7 +90,7 @@ class PlayerSpider(scrapy.Spider):
     def parse_player(self, response: Response, **kwargs):
         selector = Selector(response)
 
-        item = PlayerItem()
+        item = GeneralItem()
         item['_id'] = response.meta.get('id')
         item['type'] = 'player'
         item['info'] = self.extract_info(selector)
@@ -261,9 +261,9 @@ class PlayerSpider(scrapy.Spider):
                     print(cell.xpath('.//text()').extract_first())
                     continue
                 if cell.xpath('.//a').extract_first():
-                    text = cell.xpath('.//a/text()').extract_first()
+                    # text = cell.xpath('.//a/text()').extract_first()
                     href = cell.xpath('.//a/@href').extract_first()
-                    data[headers[idx]] = (text, href)
+                    data[headers[idx]] = href
                 else:
                     data[headers[idx]] = cell.xpath('.//text()').extract_first()     
             all_data.append(data)

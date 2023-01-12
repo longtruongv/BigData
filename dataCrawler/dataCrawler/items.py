@@ -5,8 +5,26 @@
 
 import scrapy
 
-class PlayerItem(scrapy.Item):
+class GeneralItem(scrapy.Item):
     _id = scrapy.Field()
     type = scrapy.Field()
     info = scrapy.Field()
     stats = scrapy.Field()
+
+# class PlayerItem(scrapy.Item):
+#     _id = scrapy.Field()
+#     type = scrapy.Field()
+#     info = scrapy.Field()
+#     stats = scrapy.Field()
+
+# class ClubItem(scrapy.Item):
+#     _id = scrapy.Field()
+#     type = scrapy.Field()
+#     info = scrapy.Field()
+#     stats = scrapy.Field()
+
+# class LeagueItem(scrapy.Item):
+#     _id = scrapy.Field()
+#     type = scrapy.Field()
+#     info = scrapy.Field()
+#     stats = scrapy.Field()
