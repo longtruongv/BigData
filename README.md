@@ -18,7 +18,7 @@
     - Vào Docker Desktop, mục `Container / Apps`
     - Chọn `pyspark-notebook`
     - Tìm dòng này và mở bằng trình duyệt: 
-    ![Pyspark Notebook](resource\image\pyspark-notebook.png?raw=true)
+    ![pyspark-notebook](https://user-images.githubusercontent.com/57038442/212036829-f074d9b1-40cf-483b-9cd8-ecc369c432ff.png)
 - Khi có Pyspark Notebook (Jupyter), chạy các notebook ở folder `spark`.
 
 # Nhiệm vụ (Phần này đang tìm hiểu để làm):
