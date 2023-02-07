@@ -1,15 +1,16 @@
 import scrapy
 from scrapy import Selector
 from scrapy.http import Request, Response
-
+import re
 from dataCrawler.items import GeneralItem
+import dataCrawler.utils as utils
 
 LEAGUE_LIST = [
-    '/en/comps/9/Premier-League-Stats',
-    # '/en/comps/12/La-Liga-Stats',
-    # '/en/comps/11/Serie-A-Stats',
-    # '/en/comps/13/Ligue-1-Stats',
-    # '/en/comps/20/Bundesliga-Stats',
+    '/en/comps/9/history/Premier-League-Seasons',
+    '/en/comps/12/history/La-Liga-Seasons',
+    '/en/comps/11/history/Serie-A-Seasons',
+    '/en/comps/13/history/Ligue-1-Seasons',
+    '/en/comps/20/history/Bundesliga-Seasons',
 ]
 
 class ClubSpider(scrapy.Spider):
@@ -29,26 +30,40 @@ class ClubSpider(scrapy.Spider):
                 url=url,
                 callback=self.parse_league,
             )
-    
+
     def parse_league(self, response: Response, **kwargs):
         selector = Selector(response)
-        club_uri_list = selector.xpath('//div[@id="all_stats_squads_standard"]//table/tbody/tr/th/a/@href').extract()
+        season_uri_list = selector.xpath('//*[@data-stat="league_name"]/a/@href').extract()
+        print('check_league', season_uri_list)
+        for season_uri in season_uri_list:
+            url = f'{self.based_url}{season_uri}'
 
+            yield Request(
+                url=url,
+                callback=self.parse_league_season,
+            )
+    
+    def parse_league_season(self, response: Response, **kwargs):
+        selector = Selector(response)
+        club_uri_list = selector.xpath('//*[@data-stat="team"]/a/@href').extract()
+        print('check_club',club_uri_list)
         for club_uri in club_uri_list:
-            club_id = self.extract_id(club_uri)
+            club_id_season = self.extract_id_season(club_uri)
             url = f'{self.based_url}{club_uri}'
 
             yield Request(
                 url=url,
                 callback=self.parse_club,
-                meta={'id': club_id}
+                meta={'id_season': club_id_season}
             )
 
     def parse_club(self, response: Response, **kwargs):
             selector = Selector(response)
+
+            id, season = response.meta.get('id_season')
             
             item = GeneralItem()
-            item['_id'] = response.meta.get('id')
+            item['_id'] = id + "##" + season
             item['type'] = 'club'
             item['info'] = self.extract_info(selector)
             item['stats'] = self.extract_stats(selector)
@@ -60,12 +75,13 @@ class ClubSpider(scrapy.Spider):
     ## EXTRACT FROM DATA ##
     #######################
 
-    def extract_id(self, uri: str):
+    def extract_id_season(self, uri: str):
         try:
             elements = uri.split('/')
-            return elements[-2]
+            idx = elements.index('squads')
+            return (elements[idx + 2], elements[idx + 3])
         except:
-            return None
+            return None, None
 
     def extract_info(self, selector: Selector):
         selector_ = selector.xpath('//*[@id="meta"]/div')
@@ -75,11 +91,13 @@ class ClubSpider(scrapy.Spider):
         else:
             selector = selector_[0]
 
-        clubname = selector.xpath('.//h1/span/text()').extract_first()
+        info = selector.xpath('.//h1/span/text()').extract()
+        name = info[0]
+        name = re.sub('\s+', '', name)
         # SỬA REGEX
-         
+
         return {
-            'ClubName': clubname,
+            'ClubName': name,
         }
 
     def extract_stats(self, selector: Selector):
@@ -139,9 +157,9 @@ class ClubSpider(scrapy.Spider):
                     continue
                 if cell.xpath('.//a').extract_first():
                     # text = cell.xpath('.//a/text()').extract_first()
-                    href = cell.xpath('.//a/@href').extract_first()
-                    data[headers[idx]] = href
+                    id_in_href = utils.parse_id_from_uri(cell.xpath('.//a/@href').extract_first())
+                    data[headers[idx]] = id_in_href
                 else:
-                    data[headers[idx]] = cell.xpath('.//text()').extract_first()     
+                    data[headers[idx]] = utils.parse_num(cell.xpath('.//text()').extract_first())
             all_data.append(data)
         return all_data

@@ -3,6 +3,7 @@ from scrapy import Selector
 from scrapy.http import Request, Response
 
 from dataCrawler.items import GeneralItem
+import dataCrawler.utils as utils
 
 # COUNTRY_LIST = [
 #     '/en/country/players/ENG/England-Football-Players',
@@ -16,11 +17,11 @@ from dataCrawler.items import GeneralItem
 # ]
 
 LEAGUE_LIST = [
-    '/en/comps/9/Premier-League-Stats',
-    # '/en/comps/12/La-Liga-Stats',
-    # '/en/comps/11/Serie-A-Stats',
-    # '/en/comps/13/Ligue-1-Stats',
-    # '/en/comps/20/Bundesliga-Stats',
+    # '/en/comps/9/Premier-League-Stats',
+    '/en/comps/12/La-Liga-Stats',
+    '/en/comps/11/Serie-A-Stats',
+    '/en/comps/13/Ligue-1-Stats',
+    '/en/comps/20/Bundesliga-Stats',
 ]
 
 class PlayerSpider(scrapy.Spider):
@@ -135,43 +136,56 @@ class PlayerSpider(scrapy.Spider):
     def extract_id(self, uri: str):
         try:
             elements = uri.split('/')
-            return elements[-2]
+            idx = elements.index('players')
+            return elements[idx+1]
         except:
             return None
 
-    
+
     def extract_info(self, selector: Selector):
-        selector_ = selector.xpath('//*[@id="meta"]/div')
-        if selector_[0].xpath('.//@class').extract_first() == 'media-item':
-            selector = selector_[1]
+        if 'media-item' in selector.xpath('//*[@id="meta"]/div[1]/@class').extract_first():
+            curr_xpath = '//*[@id="meta"]/div[2]'
         else:
-            selector = selector_[0]
+            curr_xpath = '//*[@id="meta"]/div[1]'
 
-        shortname = selector.xpath('./h1/span/text()').extract_first()
-        
-        offset = 0
+        selector = selector.xpath(curr_xpath)
 
-        if selector.xpath(f'./p[{offset}]/strong/text()').extract_first() == 'Position:':
-            fullname = selector.xpath(f'./p[{offset}]/strong/text()').extract_first()
-            offset += 1
-        else:
+        shortname = selector.xpath(curr_xpath + '/h1/span/text()').extract_first()
+
+        offset = 1
+        if 'Position:' in selector.xpath(curr_xpath + '/p[1]/strong/text()').extract_first():
             fullname = None
+            remain_offset_len = len(selector.xpath(curr_xpath + '/p').extract())
+        else:
+            fullname = selector.xpath(curr_xpath + '/p[1]/strong/text()').extract_first()
+            offset += 1
+            remain_offset_len = len(selector.xpath(curr_xpath + '/p').extract()) - 1
 
-        position = selector.xpath(f'./p[{offset}]/text()[1]').extract_first()
-        footed = selector.xpath(f'./p[{offset}]/text()[2]').extract_first()
-        offset += 1
 
-        height = selector.xpath(f'./p[{offset}]/span[0]/text()').extract_first()
-        weight = selector.xpath(f'./p[{offset}]/span[1]/text()').extract_first()
-        offset += 1
+        position, footed, height, weight, dob, nation, club = None, None, None, None, None, None, None
 
-        dob = selector.xpath(f'./p[{offset}]/span/@data-birth').extract_first()
-        offset += 1
+        for i in range(remain_offset_len):
+            temp_offset = offset + i
 
-        nation_uri = selector.xpath(f'./p[{offset}]/a/@href').extract_first()
-        offset += 1
+            if len(selector.xpath(curr_xpath + f'/p[{temp_offset}]/strong').extract()) == 0:
+                height = selector.xpath(curr_xpath + f'/p[{temp_offset}]/span[1]/text()').extract_first()
+                weight = selector.xpath(curr_xpath + f'/p[{temp_offset}]/span[2]/text()').extract_first()
 
-        club_uri = selector.xpath(f'./p[{offset}]/a/@href').extract_first()
+            elif 'Position:' in selector.xpath(curr_xpath + f'/p[{temp_offset}]/strong/text()').extract_first():
+                position = selector.xpath(curr_xpath + f'/p[{temp_offset}]/text()[1]').extract_first()
+                footed = selector.xpath(curr_xpath + f'/p[{temp_offset}]/text()[2]').extract_first()
+
+            elif 'Born:' in selector.xpath(curr_xpath + f'/p[{temp_offset}]/strong/text()').extract_first():
+                dob = selector.xpath(curr_xpath + f'/p[{temp_offset}]/span/@data-birth').extract_first()
+
+            elif any(
+                item in selector.xpath(curr_xpath + f'/p[{temp_offset}]/strong/text()').extract_first() 
+                for item in ['National Team:', 'Citizenship:']
+            ):
+                nation = utils.parse_id_from_uri(selector.xpath(curr_xpath + f'/p[{temp_offset}]/a/@href').extract_first())
+
+            elif 'Club:' in selector.xpath(curr_xpath + f'/p[{temp_offset}]/strong/text()').extract_first():
+                club = utils.parse_id_from_uri(selector.xpath(curr_xpath + f'/p[{temp_offset}]/a/@href').extract_first())
 
         return {
             'ShortName': shortname,
@@ -181,9 +195,10 @@ class PlayerSpider(scrapy.Spider):
             'Weight': weight,
             'Footed': footed,
             'DOB': dob,
-            'Nationality': nation_uri,
-            'Club': club_uri,
+            'Nationality': nation,
+            'Club': club,
         }
+
 
     def extract_stats(self, selector: Selector):
         # STANDARD STATS
@@ -254,17 +269,24 @@ class PlayerSpider(scrapy.Spider):
 
         all_data = []
         for row in rows:
+            check = []
             cells = row.xpath('.//th|.//td')
             data = {}
             for idx, cell in enumerate(cells):
                 if cell.xpath('.//@class').extract_first() in ['thead', 'over_header thead']:
-                    print(cell.xpath('.//text()').extract_first())
+                    # print(cell.xpath('.//text()').extract_first())
                     continue
                 if cell.xpath('.//a').extract_first():
                     # text = cell.xpath('.//a/text()').extract_first()
-                    href = cell.xpath('.//a/@href').extract_first()
-                    data[headers[idx]] = href
+                    id_in_href = utils.parse_id_from_uri(cell.xpath('.//a/@href').extract_first())
+                    # print('check',headers[idx])
+                    if headers[idx] not in check:
+                        data[headers[idx]] = id_in_href
+                        check.append(headers[idx])
                 else:
-                    data[headers[idx]] = cell.xpath('.//text()').extract_first()     
+                    # print('check', headers[idx])
+                    if headers[idx] not in check:
+                        data[headers[idx]] = utils.parse_num(cell.xpath('.//text()').extract_first())
+                        check.append(headers[idx])
             all_data.append(data)
         return all_data

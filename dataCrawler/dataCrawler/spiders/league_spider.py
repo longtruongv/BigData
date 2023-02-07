@@ -1,15 +1,16 @@
 import scrapy
 from scrapy import Selector
 from scrapy.http import Request, Response
-
+import re
 from dataCrawler.items import GeneralItem
+import dataCrawler.utils as utils
 
 LEAGUE_LIST = [
-    '/en/comps/9/Premier-League-Stats',
-    # '/en/comps/12/La-Liga-Stats',
-    # '/en/comps/11/Serie-A-Stats',
-    # '/en/comps/13/Ligue-1-Stats',
-    # '/en/comps/20/Bundesliga-Stats',
+    '/en/comps/9/history/Premier-League-Seasons',
+    '/en/comps/12/history/La-Liga-Seasons',
+    '/en/comps/11/history/Serie-A-Seasons',
+    '/en/comps/13/history/Ligue-1-Seasons',
+    '/en/comps/20/history/Bundesliga-Seasons',
 ]
 
 class LeagueSpider(scrapy.Spider):
@@ -23,20 +24,34 @@ class LeagueSpider(scrapy.Spider):
 
     def start_requests(self):
         for league_uri in LEAGUE_LIST:
-            league_id = self.extract_id(league_uri)
             url = f'{self.based_url}{league_uri}'
 
             yield Request(
                 url=url,
                 callback=self.parse_league,
-                meta={'id': league_id},
             )
 
     def parse_league(self, response: Response, **kwargs):
         selector = Selector(response)
+        season_uri_list = selector.xpath('//*[@data-stat="league_name"]/a/@href').extract()
+        print('check', season_uri_list)
+        for season_uri in season_uri_list:
+            league_id_season = self.extract_id_season(season_uri)
+            url = f'{self.based_url}{season_uri}'
+
+            yield Request(
+                url=url,
+                callback=self.parse_league_season,
+                meta={'id_season': league_id_season},
+            )
+
+    def parse_league_season(self, response: Response, **kwargs):
+        selector = Selector(response)
+        
+        id, season = response.meta.get('id_season')
 
         item = GeneralItem()
-        item['_id'] = response.meta.get('id')
+        item['_id'] = id + "##" + season
         item['type'] = 'league'
         item['info'] = self.extract_info(selector)
         item['stats'] = self.extract_stats(selector)
@@ -47,12 +62,13 @@ class LeagueSpider(scrapy.Spider):
     ## EXTRACT FROM DATA ##
     #######################
 
-    def extract_id(self, uri: str):
+    def extract_id_season(self, uri: str):
         try:
             elements = uri.split('/')
-            return elements[-2]
+            idx = elements.index('comps')
+            return (elements[idx+1], elements[idx+2])
         except:
-            return None
+            return None, None
 
     def extract_info(self, selector: Selector):
         selector_ = selector.xpath('//*[@id="meta"]/div')
@@ -62,17 +78,22 @@ class LeagueSpider(scrapy.Spider):
         else:
             selector = selector_[0]
 
-        leaguename = selector.xpath('.//h1/text()').extract_first()
-        # SỬA REGEX
-
+        leaguename = selector.xpath('.//h1/text()').extract()
+        s = leaguename[0]
+        s = re.sub('\s+', '', s)
         return {
-            'LeagueName': leaguename,
+            'LeagueName': s,
         }
 
     def extract_stats(self, selector: Selector):
-        # STANDARD STATS
+        # STANDARD SQUAD STATS
         standard_table = selector.xpath('//*[@id="stats_squads_standard_for"]')
         standard = self.extract_stats_table(standard_table)
+
+        # STANDARD PLAYER STATS
+        player_table = selector.xpath('//*[@id="stats_standard"]')
+        print('test',player_table)
+        player = self.extract_stats_table(player_table)
 
         # SHOOTING STATS
         shooting_table = selector.xpath('//*[@id="stats_squads_shooting_for"]')
@@ -97,6 +118,7 @@ class LeagueSpider(scrapy.Spider):
 
         return {
             'std': standard,
+            'player_stats':player,
             'shooting': shooting,
             'passing': passing,
             # 'pass_type': pass_type,
@@ -119,6 +141,7 @@ class LeagueSpider(scrapy.Spider):
 
         all_data = []
         for row in rows:
+            check = []
             cells = row.xpath('.//th|.//td')
             data = {}
             for idx, cell in enumerate(cells):
@@ -127,9 +150,19 @@ class LeagueSpider(scrapy.Spider):
                     continue
                 if cell.xpath('.//a').extract_first():
                     # text = cell.xpath('.//a/text()').extract_first()
-                    href = cell.xpath('.//a/@href').extract_first()
-                    data[headers[idx]] = href
+                    id_in_href = utils.parse_id_from_uri(cell.xpath('.//a/@href').extract_first())
+                    if headers[idx] not in check:
+                        data[headers[idx]] = id_in_href
+                        check.append(headers[idx])
+                    else:
+                        headers[idx] = headers[idx] + '2'
+                        data[headers[idx]] = id_in_href
                 else:
-                    data[headers[idx]] = cell.xpath('.//text()').extract_first()     
+                    if headers[idx] not in check:
+                        data[headers[idx]] = utils.parse_num(cell.xpath('.//text()').extract_first())
+                        check.append(headers[idx])
+                    else:
+                        headers[idx] = headers[idx] + '2'
+                        data[headers[idx]] = utils.parse_num(cell.xpath('.//text()').extract_first())
             all_data.append(data)
         return all_data

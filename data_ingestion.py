@@ -20,6 +20,14 @@ class MongoConnection:
         except Exception as e:
             logging.error(e)
 
+    def upsert(self, data: dict, collection_name):
+        try: 
+            collection = self.db[collection_name]
+            collection.replace_one({"_id": data["_id"]}, data, upsert=True) 
+            logging.debug(f"Inserted data to collection {collection}: {data}")
+        except Exception as e:
+            logging.error(e)
+
 
 class KafkaConnection:
     def __init__(self, bootstrap_server, group_id, topic):
@@ -59,7 +67,7 @@ class DataIngestion:
         self.mongo = MongoConnection(
             mongo_server = mongo_server, 
             mongo_port = mongo_port, 
-            mongo_db = "football_data"
+            mongo_db = "football_data_new"
         )
 
     def ingest(self):
@@ -85,7 +93,9 @@ class DataIngestion:
     def process_mongo(self, records):
         for record in records:
             collection = record['type']
-            self.mongo.insert(record, collection)
+            # self.mongo.insert(record, collection)
+            self.mongo.upsert(record, collection)
+
 
 def main():
     ingestion = DataIngestion(
