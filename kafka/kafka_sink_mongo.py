@@ -25,8 +25,10 @@ class MongoConnection:
             collection = self.db[collection_name]
             collection.replace_one({"_id": data["_id"]}, data, upsert=True) 
             logging.debug(f"Inserted data to collection {collection}: {data}")
+            print("OK")
         except Exception as e:
             logging.error(e)
+            print("ERROR")
 
 
 class KafkaConnection:

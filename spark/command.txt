@@ -1,0 +1,22 @@
+# create container
+cd spark
+docker-compose scale spark-worker-demo=3
+docker-compose run --rm -w /project spark-driver
+
+# spark ui
+http://localhost:8080
+
+# in shell:
+# process player
+../spark/bin/spark-submit --master spark://spark-master-demo:7077 --packages org.mongodb.spark:mongo-spark-connector_2.12:3.0.1,org.postgresql:postgresql:42.5.0 process_player.py  1000
+
+    # packages:
+    org.mongodb.spark:mongo-spark-connector_2.12:3.0.1
+    org.postgresql:postgresql:42.5.0
+
+# write elasticsearch
+    
+    
+    # packages:
+    commons-httpclient:commons-httpclient:3.1
+    org.elasticsearch:elasticsearch-spark-20_2.11:6.4.2

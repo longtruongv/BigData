@@ -1,0 +1,27 @@
+version: "3.0"
+services:
+  elasticsearch:
+    container_name: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.11.0
+    environment:
+      - xpack.security.enabled=false
+      - "discovery.type=single-node"
+    networks:
+      - bigdataprj_my-net
+    ports:
+      - 9200:9200
+  kibana:
+    container_name: kibana
+    image: docker.elastic.co/kibana/kibana:7.11.0
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    networks:
+      - bigdataprj_my-net
+    depends_on:
+      - elasticsearch
+    ports:
+      - 5601:5601
+
+networks:
+  bigdataprj_my-net:
+    external: true
